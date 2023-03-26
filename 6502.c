@@ -24,8 +24,15 @@ struct cpu{
     };
 };
 
+
+/*
+The first 256 bytes (FF) page of memory is referred to as 'Zero Page' and is the focus of a number of special addresing modes that result in shorter (and quicker)
+instructions or allow indirect access to memory. Second page ($0100 to $01FF) is reserved for the stack and cannot be relocated.
+*/
+
 void initialize_cpu(struct cpu* cpu_6502){
     cpu_6502->SR = 0b00100100;
+    cpu_6502->SP = 0x00; // This is an indirect address ($0100 to $01FF reserved for the stack)
 }
 
 // Will need big switch case to execute instructions
@@ -36,6 +43,10 @@ void execute_instruction(struct cpu* cpu_6502){
 void main(int argc, char** argv){
     struct cpu cpu_6502;
     initialize_cpu(&cpu_6502);
+
+    if(cpu_6502.flag.U == 1){ // Means that the bytes use big endian!
+        printf("Yes!\n");
+    }
 
     exit(EXIT_SUCCESS);
 }
