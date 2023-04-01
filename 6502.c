@@ -1,3 +1,4 @@
+#include<stdio.h>
 #include<stdlib.h>
 
 #define ADDRESS_SPACE 65536
@@ -27,12 +28,12 @@ struct cpu {
     unsigned char X; // Index register (Typically holds counters or offsets for accessing memory. The value of the X register can be loaded and saved in memory, compared with values held in memory or incremented and decremented. The X register has one special function. It can be used to get a copy of the stack pointer or change its value.)
     unsigned char Y; // Index register (Same as X. It has no special functions) 
     union{
-        unsigned short PC
+        unsigned short PC;
         struct {
             unsigned char PCL;
             unsigned char PCH;
         };
-    }
+    };
     ; // Program counter (points to the next instruction to be executed. PCL and PCH registers within 8 bit each)
     unsigned char SP; // Stack pointer (pushing bytes results in decrementing the stack pointer and vice versa. The CPU does not detect if the stack is overflowed by excessive pushing or pulling operations and will most likely result in the program crashing.)
     union {
@@ -45,7 +46,7 @@ struct cpu {
             unsigned char I: 1; // Interrupt flag (1 for disable of interrupts)
             unsigned char Z: 1; // Zero flag (1 if the result of last arithmetic operation resulted in zero)
             unsigned char C: 1; // Carry flag (1 if there was a carry in the result of the most the recent operation)
-        }
+        };
         unsigned char SR; // Status register (contains flags)
     };
 };
@@ -67,10 +68,11 @@ the power on reset location ($FFFC/D) and the BRK/interrupt request handler ($FF
 
 void initialize_cpu(struct cpu* cpu_6502, char** address_space){
     if(cpu_6502 == NULL){
+        fprintf(stderr, "");
         exit(EXIT_FAILURE);
     }
 
-    cpu_6502->SR = 0b00100100
+    cpu_6502->SR = 0b00100100;
     cpu_6502->SP = 0x00; // This is an indirect address ($0100 to $01FF reserved for the stack, grows downward)
 
     // Important to also set the program counter
@@ -78,15 +80,23 @@ void initialize_cpu(struct cpu* cpu_6502, char** address_space){
     *address_space = malloc(ADDRESS_SPACE);
 
     if(!address_space){
+        fprintf(stderr, "");
         exit(EXIT_FAILURE);
     } 
 }
 
 // Instruction med char args (this one is going to be long lol)
 void execute_instruction(struct cpu* cpu_6502, char* address_space, unsigned char instruction, char* args){
+    if(cpu_6502 == NULL){
+        fprintf(stderr, "");
+        exit(EXIT_FAILURE);
+    }
+
     switch(instruction){
         case 0x00: // BRK (implied)
-            break
+            cpu_6502->PC++;
+            
+            break;
         case 0x01: // ORA (IND, X)
             break;
         case 0x05: // ORA (ZP)
@@ -110,6 +120,9 @@ void execute_instruction(struct cpu* cpu_6502, char* address_space, unsigned cha
         case 0x16: // ASL (ZP, X)
             break;
         case 0x18: // CLC (implied)
+            cpu_6502->C = 0;
+            cpu_6502->PC++;
+            // Pause one clock cycle
             break;
         case 0x19: // ORA (ABS, Y)
             break;
