@@ -1,27 +1,7 @@
 #include<stdio.h>
 #include<stdlib.h>
 
-#define ADDRESS_SPACE 65536
-
-// Byte count for each segment of instruction
-const char instructions[256] = {
-    1, 2, 0, 0, 0, 2, 2, 0, 1, 2, 1, 0, 0, 3, 3, 0,
-    2, 2, 0, 0, 0, 2, 2, 0, 1, 3, 0, 0, 0, 3, 3, 0,
-    3, 2, 0, 0, 2, 2, 2, 0, 1, 2, 1, 0, 3, 3, 3, 0,
-    2, 2, 0, 0, 0, 2, 2, 0, 1, 3, 0, 0, 0, 3, 3, 0,
-    1, 2, 0, 0, 0, 2, 2, 0, 1, 2, 1, 0, 3, 3, 3, 0,
-    2, 2, 0, 0, 0, 2, 2, 0, 1, 3, 0, 0, 0, 3, 3, 0,
-    1, 2, 0, 0, 0, 2, 2, 0, 1, 2, 1, 0, 3, 3, 3, 0,
-    2, 2, 0, 0, 0, 2, 2, 0, 1, 3, 0, 0, 0, 3, 3, 0,
-    2, 2, 0, 0, 2, 2, 2, 0, 1, 0, 1, 0, 3, 3, 3, 0,
-    2, 2, 0, 0, 2, 2, 2, 0, 1, 3, 1, 0, 0, 3, 0, 0,
-    2, 2, 2, 0, 2, 2, 2, 0, 1, 2, 1, 0, 3, 3, 3, 0,
-    2, 2, 0, 0, 2, 2, 2, 0, 1, 3, 1, 0, 3, 3, 3, 0,
-    2, 2, 0, 0, 2, 2, 2, 0, 1, 2, 1, 0, 3, 3, 3, 0,
-    2, 2, 0, 0, 0, 2, 2, 0, 1, 3, 0, 0, 0, 3, 3, 0,
-    2, 2, 0, 0, 2, 2, 2, 0, 1, 2, 1, 0, 3, 3, 3, 0,
-    2, 2, 0, 0, 0, 2, 2, 0, 1, 3, 0, 0, 0, 3, 3, 0
-};
+#define ADDRESS_SPACE_SIZE 65536
 
 struct cpu {
     unsigned char A; // Accumulator (uses all arithmetic and logical operations except for increments and decrements. The content of A can be stored  and retrieved either from memory or from the stack. Most complex operations will need to use the accumulator for arithmetic and efficient optimisation of its use is a key feature of time critical routines.)
@@ -35,7 +15,7 @@ struct cpu {
         };
     };
     ; // Program counter (points to the next instruction to be executed. PCL and PCH registers within 8 bit each)
-    unsigned char SP; // Stack pointer (pushing bytes results in decrementing the stack pointer and vice versa. The CPU does not detect if the stack is overflowed by excessive pushing or pulling operations and will most likely result in the program crashing.)
+    unsigned short SP; // Stack pointer (pushing bytes results in decrementing the stack pointer and vice versa. The CPU does not detect if the stack is overflowed by excessive pushing or pulling operations and will most likely result in the program crashing.)
     union {
         struct {
             unsigned char N: 1; // Negative flag (1 if result most significant bit was set)
@@ -50,7 +30,6 @@ struct cpu {
         unsigned char SR; // Status register (contains flags)
     };
 };
-
 
 /*
 Basic architecture
@@ -67,37 +46,45 @@ the power on reset location ($FFFC/D) and the BRK/interrupt request handler ($FF
 */
 
 void initialize_cpu(struct cpu* cpu_6502, char** address_space){
-    if(cpu_6502 == NULL){
-        fprintf(stderr, "");
-        exit(EXIT_FAILURE);
-    }
-
     cpu_6502->SR = 0b00100100;
-    cpu_6502->SP = 0x00; // This is an indirect address ($0100 to $01FF reserved for the stack, grows downward)
+    cpu_6502->SP = 0x100; // This is an indirect address ($0100 to $01FF reserved for the stack, grows downward)
 
-    // Important to also set the program counter
+    // Rememeber: Set the program counter !important
 
-    *address_space = malloc(ADDRESS_SPACE);
+    *address_space = malloc(ADDRESS_SPACE_SIZE);
 
     if(!address_space){
-        fprintf(stderr, "");
+        fprintf(stderr, "Allocation of memory failed for emulation");
         exit(EXIT_FAILURE);
     } 
 }
 
 // Instruction med char args (this one is going to be long lol)
 void execute_instruction(struct cpu* cpu_6502, char* address_space, unsigned char instruction, char* args){
-    if(cpu_6502 == NULL){
-        fprintf(stderr, "");
-        exit(EXIT_FAILURE);
-    }
-
     switch(instruction){
         case 0x00: // BRK (implied)
-            cpu_6502->PC++;
-            
+            cpu_6502->PC += 2;
+            cpu_6502->SP -= 2;
+
+            // Saving the program counter after interrupt handler
+            address_space[cpu_6502->SP] = cpu_6502->PCL; 
+            address_space[cpu_6502->SP + 1] = cpu_6502->PCH;
+
+            cpu_6502->SP--;
+            address_space[cpu_6502->SP] = cpu_6502->SR; // Save status register
+
+            cpu_6502->I = 1; // Setting interrupt flag
+            cpu_6502->PCH = address_space[0xFFFF]; // Load the PCH
+            cpu_6502->PCL = address_space[0xFFFE]; // Load the PCL
+
+            // Pause cycles  (7)
             break;
         case 0x01: // ORA (IND, X)
+            cpu_6502->PC += 1; // Increment program counter for easier fetch;
+            unsigned short pointer = (address_space[cpu_6502->PC + 1] << 8) | address_space[cpu_6502->PC + 1]; // Does zero page
+            cpu_6502->A = cpu_6502->A | address_space[pointer];
+            cpu_6502->PC += 1;
+            // Pause cycles (6)
             break;
         case 0x05: // ORA (ZP)
             break;
@@ -168,7 +155,14 @@ void execute_instruction(struct cpu* cpu_6502, char* address_space, unsigned cha
             break;
         case 0x3E: // ROL (ABS, X)
             break; // End 4th row
-        case 0x40: //ERI (implied)
+        case 0x40: // RTI (implied)
+            cpu_6502->SR = address_space[cpu_6502->SP]; // Restore status register (SR)
+            cpu_6502->SP++; // Increment stack pointer
+            cpu_6502->PCL = address_space[cpu_6502->SP]; // Load PCL with next instruction lower byte
+            cpu_6502->SP++; // Increment stack pointer
+            cpu_6502->PCH = address_space[cpu_6502->SP]; // Load PCLH with next instruction higher byte
+            cpu_6502->SP++; // Increment stack pointer
+            // Pause cycles (6)
             break;
         case 0x41: // EOR (IND, X)
             break;
@@ -401,5 +395,7 @@ void execute_instruction(struct cpu* cpu_6502, char* address_space, unsigned cha
 
         default:
             break
+
+        // There will be added more unofficial instructions
     }
 }
