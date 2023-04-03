@@ -1,7 +1,10 @@
 #include<stdio.h>
 #include<stdlib.h>
+#include<time.h>
+#include<errno.h>
 
 #define ADDRESS_SPACE_SIZE 65536
+#define CYCLE_TIME 559 // Nanoseconds
 
 struct cpu {
     unsigned char A; // Accumulator (uses all arithmetic and logical operations except for increments and decrements. The content of A can be stored  and retrieved either from memory or from the stack. Most complex operations will need to use the accumulator for arithmetic and efficient optimisation of its use is a key feature of time critical routines.)
@@ -30,6 +33,9 @@ struct cpu {
         unsigned char SR; // Status register (contains flags)
     };
 };
+
+struct timespec req = {0, CYCLE_TIME};
+struct timespec rem = {0};
 
 /*
 Basic architecture
@@ -60,7 +66,7 @@ void initialize_cpu(struct cpu* cpu_6502, char** address_space){
 }
 
 // Instruction med char args (this one is going to be long lol)
-void execute_instruction(struct cpu* cpu_6502, char* address_space, unsigned char instruction, char* args){
+void execute_instruction(struct cpu* cpu_6502, unsigned char* address_space, unsigned char instruction, char* args){
     switch(instruction){
         case 0x00: // BRK (implied)
             cpu_6502->PC += 2;
@@ -77,18 +83,32 @@ void execute_instruction(struct cpu* cpu_6502, char* address_space, unsigned cha
             cpu_6502->PCH = address_space[0xFFFF]; // Load the PCH
             cpu_6502->PCL = address_space[0xFFFE]; // Load the PCL
 
+            req.tv_nsec = CYCLE_TIME * 7;
+            clock_nanosleep(CLOCK_MONOTONIC, 0, );
+
             // Pause cycles  (7)
             break;
         case 0x01: // ORA (IND, X)
-            cpu_6502->PC += 1; // Increment program counter for easier fetch;
-            unsigned short pointer = (address_space[cpu_6502->PC + 1] << 8) | address_space[cpu_6502->PC + 1]; // Does zero page
-            cpu_6502->A = cpu_6502->A | address_space[pointer];
-            cpu_6502->PC += 1;
+            unsigned short indirect_addr = cpu_6502->X + address_space[cpu_6502->PC];
+            // Set the overflow flag somehow if resulting operation overflow
+            if(indirect_addr > 0x00FF){ // If there is an overflow, set the overflow flag (research if this is a correct understanding, ChatGPT is not trustworthy)
+                cpu_6502->O = 1; // Set the overflow flag, 
+                indirect_addr %= 0x0100;
+            }
+
+            unsigned short direct_address = *(unsigned short*)(address_space + indirect_addr);
+            cpu_6502->A = cpu_6502->A | address_space[direct_address];
+            cpu_6502->PC += 2;
             // Pause cycles (6)
             break;
         case 0x05: // ORA (ZP)
+            unsigned char zp_addr = address_space[cpu_6502->PC + 1];
+            cpu_6502->A = cpu_6502->A | address_space[zp_addr];
+            cpu_6502->PC += 2;
+            // Pause cycles (?????)
             break;
         case 0x06: // ASL (ZP)
+            
             break;
         case 0x08: // PHP (implied)
             break;
@@ -305,6 +325,9 @@ void execute_instruction(struct cpu* cpu_6502, char* address_space, unsigned cha
         case 0xB6: // LDX (ZP, Y)
             break;
         case 0xB8: // CLV (implied)
+            cpu_6502->PC++; // ????
+            cpu_6502->O = 0;
+            // Pause cycles (????)
             break;
         case 0xB9: // LDA (ABS, Y)
             break;
