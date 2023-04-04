@@ -1,0 +1,50 @@
+Prosessor:
+Gjøre ferdig alle instruksjonene
+Det er viktig å gjøre noe dersom PC går utover 2^16.
+Sette flag for aritmetiske operasjoner
+Interrupts
+Blocking og cycles
+
+tekst:
+Sure, I'd be happy to explain how interrupts work in the context of the 6502 microprocessor.
+
+An interrupt is a mechanism that allows a device or peripheral to interrupt the normal program flow of a microprocessor and request its attention. Interrupts are commonly used in systems with real-time requirements or I/O devices that need to respond quickly to external events.
+
+In the 6502, there are two types of interrupts: maskable interrupts (IRQ) and non-maskable interrupts (NMI). The main difference between the two is that NMIs cannot be disabled or masked by the processor, while IRQs can be enabled or disabled by setting a flag in the processor status register.
+
+When an interrupt occurs, the processor stops executing the current instruction and saves the current program counter (PC) and processor status register (PSR) on the stack. It then loads the new PC and PSR values from a predetermined location in memory, which is called an interrupt vector.
+
+The interrupt vector is simply a memory location that contains the starting address of the interrupt service routine (ISR), which is a piece of code that handles the interrupt. The ISR typically performs some specific task in response to the interrupt, such as reading data from a peripheral or updating a status flag.
+
+Once the ISR is complete, the processor restores the original PC and PSR values from the stack and resumes normal program flow as if the interrupt had never occurred. The entire process is transparent to the main program and appears as if the interrupt never happened.
+
+To use interrupts in your 6502 code, you need to set up the interrupt vector table and enable/disable IRQs as needed. Here's a simple example:
+
+css
+
+; Define the interrupt vector table
+IRQ_VECTOR: .word HandleIRQ ; IRQ handler
+NMI_VECTOR: .word HandleNMI ; NMI handler
+
+; Set up IRQ and NMI handlers
+HandleIRQ:
+    ; IRQ handler code here
+    RTI ; Return from interrupt
+
+HandleNMI:
+    ; NMI handler code here
+    RTI ; Return from interrupt
+
+; Enable IRQs
+SEI
+
+; Main program loop
+main:
+    ; Main program code here
+    JMP main ; Loop forever
+
+In this example, we define the interrupt vector table at the beginning of the code and set up the IRQ and NMI handlers. We then enable IRQs using the SEI instruction and enter a main program loop that simply jumps to itself.
+
+When an IRQ or NMI occurs, the processor will automatically jump to the corresponding ISR, execute the code there, and then return to the main program loop. Note that the RTI (Return from Interrupt) instruction is used to return from the ISR and restore the original PC and PSR values from the stack.
+
+Interrupts can be a powerful tool for adding real-time responsiveness and I/O capabilities to your 6502 code. However, they can also be complex to implement and require careful attention to timing and synchronization issues.

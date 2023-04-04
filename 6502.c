@@ -3,7 +3,7 @@
 #include<time.h>
 #include<errno.h>
 
-#define ADDRESS_SPACE_SIZE 65536
+#define ADDRESS_SPACE_SIZE 65536 // 16 bit program counter
 #define CYCLE_TIME 559 // Nanoseconds
 
 struct cpu {
@@ -81,6 +81,8 @@ void execute_instruction(struct cpu* cpu_6502, unsigned char* address_space, uns
             cpu_6502->SP--;
 
             cpu_6502->I = 1; // Setting interrupt flag
+
+            // This needs to be checked l8ter
             cpu_6502->PCH = address_space[0xFFFF]; // Load the PCH
             cpu_6502->PCL = address_space[0xFFFE]; // Load the PCL
             break;
@@ -110,6 +112,7 @@ void execute_instruction(struct cpu* cpu_6502, unsigned char* address_space, uns
             address_space[0x0100 + cpu_6502->SP] = cpu_6502->SR;
             break;
         case 0x09: // ORA (IMM)
+            cpu_6502->PC += 2;
             break;
         case 0x0A: // ASL (accum)
             break;
@@ -180,10 +183,10 @@ void execute_instruction(struct cpu* cpu_6502, unsigned char* address_space, uns
             cpu_6502->SP++; // Increment stack pointer
             cpu_6502->SR = address_space[0x0100 + cpu_6502->SP]; // Restore status register (SR)
             cpu_6502->SP++; // Increment stack pointer
-            cpu_6502->PCL = address_space[0x0100 + cpu_6502->SP]; // Load PCL with next instruction lower byte
-            cpu_6502->SP++; // Increment stack pointer
             cpu_6502->PCH = address_space[0x0100 + cpu_6502->SP]; // Load PCLH with next instruction higher byte
-            
+            cpu_6502->SP++; // Increment stack pointer
+            cpu_6502->PCL = address_space[0x0100 + cpu_6502->SP]; // Load PCL with next instruction lower byte
+            cpu_6502->B = 0;
             break;
         case 0x41: // EOR (IND, X)
             break;
@@ -215,8 +218,8 @@ void execute_instruction(struct cpu* cpu_6502, unsigned char* address_space, uns
         case 0x56: // LSR (ZP, X)
             break;
         case 0x58: // CLI (implied)
-            cpu_6502->I = 0;
             cpu_6502->PC++;
+            cpu_6502->I = 0;
             break;
         case 0x59: // EOR (ABS, Y)
             break;
