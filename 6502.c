@@ -11,31 +11,28 @@ struct cpu {
     unsigned char X; // Index register (Typically holds counters or offsets for accessing memory. The value of the X register can be loaded and saved in memory, compared with values held in memory or incremented and decremented. The X register has one special function. It can be used to get a copy of the stack pointer or change its value.)
     unsigned char Y; // Index register (Same as X. It has no special functions) 
     union{
-        unsigned short PC;
+        unsigned char PC;
         struct {
             unsigned char PCL;
             unsigned char PCH;
         };
     };
-    ; // Program counter (points to the next instruction to be executed. PCL and PCH registers within 8 bit each)
+     // Program counter (points to the next instruction to be executed. PCL and PCH registers within 8 bit each)
     unsigned short SP; // Stack pointer (pushing bytes results in decrementing the stack pointer and vice versa. The CPU does not detect if the stack is overflowed by excessive pushing or pulling operations and will most likely result in the program crashing.)
     union {
         struct {
-            unsigned char N: 1; // Negative flag (1 if result most significant bit was set)
-            unsigned char O: 1; // Overflow flag (1 if last arithmetic operation resulted in overflow)
-            unsigned char U: 1; // Unused flag (always set to 1)
-            unsigned char B: 1; // Break flag (1 if a software BRK instruction was executed)
-            unsigned char D: 1; // Decimal flag (1 if arithmetic operations are performed in decimal mode)
-            unsigned char I: 1; // Interrupt flag (1 for disable of interrupts)
-            unsigned char Z: 1; // Zero flag (1 if the result of last arithmetic operation resulted in zero)
             unsigned char C: 1; // Carry flag (1 if there was a carry in the result of the most the recent operation)
+            unsigned char Z: 1; // Zero flag (1 if the result of last arithmetic operation resulted in zero)
+            unsigned char I: 1; // Interrupt flag (1 for disable of interrupts)
+            unsigned char D: 1; // Decimal flag (1 if arithmetic operations are performed in decimal mode)
+            unsigned char B: 1; // Break flag (1 if a software BRK instruction was executed)
+            unsigned char U: 1; // Unused flag (always set to 1)
+            unsigned char O: 1; // Overflow flag (1 if last arithmetic operation resulted in overflow)
+            unsigned char N: 1; // Negative flag (1 if result most significant bit was set)
         };
         unsigned char SR; // Status register (contains flags)
     };
 };
-
-struct timespec req = {0, CYCLE_TIME};
-struct timespec rem = {0};
 
 /*
 Basic architecture
@@ -52,10 +49,10 @@ the power on reset location ($FFFC/D) and the BRK/interrupt request handler ($FF
 */
 
 void initialize_cpu(struct cpu* cpu_6502, char** address_space){
-    cpu_6502->SR = 0b00100100;
-    cpu_6502->SP = 0x100; // This is an indirect address ($0100 to $01FF reserved for the stack, grows downward)
+    cpu_6502->SR = 0b00100000; // LOOK MORE CLOSELY AT THIS LATER, MAY NOT BE RIGHT!
+    cpu_6502->SP = 0xFF; // This is an indirect address ($0100 to $01FF reserved for the stack, grows downward)
 
-    // Rememeber: Set the program counter !important
+    // Remember: Set the program counter !important
 
     *address_space = malloc(ADDRESS_SPACE_SIZE);
 
@@ -70,26 +67,26 @@ void execute_instruction(struct cpu* cpu_6502, unsigned char* address_space, uns
     switch(instruction){
         case 0x00: // BRK (implied)
             cpu_6502->PC += 2;
-            cpu_6502->SP -= 2;
+
+            cpu_6502->B = 1; // I need to think more about this later 
 
             // Saving the program counter after interrupt handler
-            address_space[cpu_6502->SP] = cpu_6502->PCL; 
-            address_space[cpu_6502->SP + 1] = cpu_6502->PCH;
-
+            address_space[0x0100 + cpu_6502->SP] = cpu_6502->PCL; 
             cpu_6502->SP--;
-            address_space[cpu_6502->SP] = cpu_6502->SR; // Save status register
+
+            address_space[0x0100 + cpu_6502->SP] = cpu_6502->PCH;
+            cpu_6502->SP--;
+
+            address_space[0x0100 + cpu_6502->SP] = cpu_6502->SR; // Save status register
+            cpu_6502->SP--;
 
             cpu_6502->I = 1; // Setting interrupt flag
             cpu_6502->PCH = address_space[0xFFFF]; // Load the PCH
             cpu_6502->PCL = address_space[0xFFFE]; // Load the PCL
-
-            req.tv_nsec = CYCLE_TIME * 7;
-            clock_nanosleep(CLOCK_MONOTONIC, 0, );
-
-            // Pause cycles  (7)
             break;
         case 0x01: // ORA (IND, X)
-            unsigned short indirect_addr = cpu_6502->X + address_space[cpu_6502->PC];
+            cpu_6502->PC += 2;
+            unsigned short indirect_addr = cpu_6502->X + address_space[cpu_6502->PC - 2];
             // Set the overflow flag somehow if resulting operation overflow
             if(indirect_addr > 0x00FF){ // If there is an overflow, set the overflow flag (research if this is a correct understanding, ChatGPT is not trustworthy)
                 cpu_6502->O = 1; // Set the overflow flag, 
@@ -98,19 +95,19 @@ void execute_instruction(struct cpu* cpu_6502, unsigned char* address_space, uns
 
             unsigned short direct_address = *(unsigned short*)(address_space + indirect_addr);
             cpu_6502->A = cpu_6502->A | address_space[direct_address];
-            cpu_6502->PC += 2;
-            // Pause cycles (6)
-            break;
-        case 0x05: // ORA (ZP)
-            unsigned char zp_addr = address_space[cpu_6502->PC + 1];
-            cpu_6502->A = cpu_6502->A | address_space[zp_addr];
-            cpu_6502->PC += 2;
-            // Pause cycles (?????)
-            break;
-        case 0x06: // ASL (ZP)
             
             break;
+        case 0x05: // ORA (ZP)
+            cpu_6502->PC += 2;
+            unsigned char zp_addr = address_space[cpu_6502->PC - 1];
+            cpu_6502->A = cpu_6502->A | address_space[zp_addr];
+            break;
+        case 0x06: // ASL (ZP)
+            break;
         case 0x08: // PHP (implied)
+            cpu_6502->PC++;
+            cpu_6502->SP--;
+            address_space[0x0100 + cpu_6502->SP] = cpu_6502->SR;
             break;
         case 0x09: // ORA (IMM)
             break;
@@ -129,7 +126,6 @@ void execute_instruction(struct cpu* cpu_6502, unsigned char* address_space, uns
         case 0x18: // CLC (implied)
             cpu_6502->C = 0;
             cpu_6502->PC++;
-            // Pause one clock cycle
             break;
         case 0x19: // ORA (ABS, Y)
             break;
@@ -148,6 +144,9 @@ void execute_instruction(struct cpu* cpu_6502, unsigned char* address_space, uns
         case 0x26: // ROL (ZP)
             break;
         case 0x28: // PLP (implied)
+            cpu_6502->PC++;
+            cpu_6502->SP++;
+            cpu_6502->SR = address_space[0x0100 + cpu_6502->SP];
             break;
         case 0x29: // AND (IMM)
             break;
@@ -168,6 +167,8 @@ void execute_instruction(struct cpu* cpu_6502, unsigned char* address_space, uns
         case 0x36: // ROL (ZP, X)
             break;
         case 0x38: // SEC (implied)
+            cpu_6502->C = 1;
+            cpu_6502->PC++;
             break;
         case 0x39: // AND (ABS, Y)
             break;
@@ -176,13 +177,13 @@ void execute_instruction(struct cpu* cpu_6502, unsigned char* address_space, uns
         case 0x3E: // ROL (ABS, X)
             break; // End 4th row
         case 0x40: // RTI (implied)
-            cpu_6502->SR = address_space[cpu_6502->SP]; // Restore status register (SR)
             cpu_6502->SP++; // Increment stack pointer
-            cpu_6502->PCL = address_space[cpu_6502->SP]; // Load PCL with next instruction lower byte
+            cpu_6502->SR = address_space[0x0100 + cpu_6502->SP]; // Restore status register (SR)
             cpu_6502->SP++; // Increment stack pointer
-            cpu_6502->PCH = address_space[cpu_6502->SP]; // Load PCLH with next instruction higher byte
+            cpu_6502->PCL = address_space[0x0100 + cpu_6502->SP]; // Load PCL with next instruction lower byte
             cpu_6502->SP++; // Increment stack pointer
-            // Pause cycles (6)
+            cpu_6502->PCH = address_space[0x0100 + cpu_6502->SP]; // Load PCLH with next instruction higher byte
+            
             break;
         case 0x41: // EOR (IND, X)
             break;
@@ -191,6 +192,9 @@ void execute_instruction(struct cpu* cpu_6502, unsigned char* address_space, uns
         case 0x46: // LSR (ZP)
             break;
         case 0x48: // PHA (implied)
+            address_space[0x0100 + cpu_6502->SP] = cpu_6502->A;
+            cpu_6502->SP--;
+            cpu_6502->PC++;
             break;
         case 0x49: // EOR (IMM)
             break;
@@ -211,6 +215,8 @@ void execute_instruction(struct cpu* cpu_6502, unsigned char* address_space, uns
         case 0x56: // LSR (ZP, X)
             break;
         case 0x58: // CLI (implied)
+            cpu_6502->I = 0;
+            cpu_6502->PC++;
             break;
         case 0x59: // EOR (ABS, Y)
             break;
@@ -219,6 +225,11 @@ void execute_instruction(struct cpu* cpu_6502, unsigned char* address_space, uns
         case 0x5E: // LSR (ABS, X)
             break; // End 6th row
         case 0x60: // RTS (implied)
+            cpu_6502->SP++;
+            cpu_6502->PCL = address_space[0x0100 + cpu_6502->SP];
+            cpu_6502->SP++;
+            cpu_6502->PCH = address_space[0x0100 + cpu_6502->SP];
+            cpu_6502->PC++;
             break;
         case 0x61: // ADC (IND, X)
             break;
@@ -227,6 +238,21 @@ void execute_instruction(struct cpu* cpu_6502, unsigned char* address_space, uns
         case 0x66: // ROR (ZP)
             break;
         case 0x68: // PLA (implied)
+            cpu_6502->SP++;
+            cpu_6502->A = address_space[cpu_6502->SP];
+
+            if(cpu_6502->A & 0b10000000){
+                cpu_6502->N = 1;
+            } else {
+                cpu_6502->N = 0;
+
+                if(cpu_6502 == 0    ){
+                    cpu_6502->Z = 0;
+                }
+            }
+
+            cpu_6502->PC++;
+
             break;
         case 0x69: // ADC (imm)
             break;
@@ -247,6 +273,8 @@ void execute_instruction(struct cpu* cpu_6502, unsigned char* address_space, uns
         case 0x76: // ROR (ZP, X)
             break;
         case 0x78: // SEI (implied)
+            cpu_6502->I = 1;
+            cpu_6502->PC++;
             break;
         case 0x79: // ADC (ABS, Y)
             break;
@@ -263,8 +291,12 @@ void execute_instruction(struct cpu* cpu_6502, unsigned char* address_space, uns
         case 0x86: // STX (ZP)
             break;
         case 0x88: // Dey (implied)
+            cpu_6502->PC++;
+            cpu_6502->Y--;
             break;
         case 0x8A: // TXA (implied)
+            cpu_6502->A = cpu_6502->X;
+            cpu_6502->PC++;
             break;
         case 0x8C: // STY (ABS)
             break;
@@ -283,10 +315,14 @@ void execute_instruction(struct cpu* cpu_6502, unsigned char* address_space, uns
         case 0x96: // STX (ZP)
             break;
         case 0x98: // TYA (implied)
+            cpu_6502->A = cpu_6502->Y;
+            cpu_6502->PC++;
             break;
         case 0x99: // STA (ABS, Y)
             break;
         case 0x9A: // TXS (implied)
+            cpu_6502->SP = cpu_6502->X;
+            cpu_6502->PC++;
             break;
         case 0x9D: // STA (ABS, X)
             break; // End 10th row
@@ -303,10 +339,15 @@ void execute_instruction(struct cpu* cpu_6502, unsigned char* address_space, uns
         case 0xA6: // LDX (ZP)
             break;
         case 0xA8: // TAY (implied)
+            // Does these instructions set the flags?
+            cpu_6502->Y = cpu_6502->A;
+            cpu_6502->PC++;
             break;
         case 0xA9: // LDA (IMM)
             break;
         case 0xAA: // TAX (implied)
+            cpu_6502->X = cpu_6502->A;
+            cpu_6502->PC++;
             break;
         case 0xAC: // LDY (ABS)
             break;
@@ -332,6 +373,8 @@ void execute_instruction(struct cpu* cpu_6502, unsigned char* address_space, uns
         case 0xB9: // LDA (ABS, Y)
             break;
         case 0xBA: // TSX (implied)
+            cpu_6502->X = cpu_6502->SP;
+            cpu_6502->PC++;
             break;
         case 0xBC: // LDY (ABS, X)
             break;
@@ -350,10 +393,14 @@ void execute_instruction(struct cpu* cpu_6502, unsigned char* address_space, uns
         case 0xC6: // DEC (ZP)
             break;
         case 0xC8: // INY (implied)
+            cpu_6502->Y++;
+            cpu_6502->PC++;
             break;
         case 0xC9: // CMP (IMM)
             break;
         case 0xCA: // DEX (implied)
+            cpu_6502->X--;
+            cpu_6502->PC++;
             break;
         case 0xCC: // CPY (ABS)
             break;
@@ -370,6 +417,8 @@ void execute_instruction(struct cpu* cpu_6502, unsigned char* address_space, uns
         case 0xD6: // DEC (ZP, X)
             break;
         case 0xD8: // CLD (implied)
+            cpu_6502->D = 0;
+            cpu_6502->PC++;
             break;
         case 0xD9: // CMP (ABS, Y)
             break;
@@ -388,10 +437,13 @@ void execute_instruction(struct cpu* cpu_6502, unsigned char* address_space, uns
         case 0xE6: // INC (ZP)
             break;
         case 0xE8: // INX (implied)
+            cpu_6502->X++;
+            cpu_6502->PC++;
             break;
         case 0xE9: // SBC (IMM)
             break;
         case 0xEA: // NOP (implied)
+            cpu_6502->PC++;
             break;
         case 0xEC: // CPX (ABS)
             break;
@@ -407,7 +459,8 @@ void execute_instruction(struct cpu* cpu_6502, unsigned char* address_space, uns
             break;
         case 0xF6: // INC (ZP, X)
             break;
-        case 0xF8: // SED (implied)
+        case 0xF8: // SED (implied) Not sure if this is even going to have any effect, I may implement this functionality later
+            cpu_6502->D = 1;
             break;
         case 0xF9: // SBC (ABS, Y)
             break;
@@ -417,6 +470,7 @@ void execute_instruction(struct cpu* cpu_6502, unsigned char* address_space, uns
             break;
 
         default:
+            // Pause one cycle?
             break
 
         // There will be added more unofficial instructions
