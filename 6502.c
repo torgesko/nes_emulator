@@ -60,21 +60,33 @@ void initialize_cpu(struct cpu* cpu_6502, unsigned char** address_space){
 }
 
 /* Interrupts */
-void IRQ(){
 
+
+/*
+IRQ (Interrupt Request): This is a lower-priority interrupt that can be disabled by software. It is triggered by external signals from devices such as timers, keyboard controllers, or serial ports. 
+The processor responds to IRQs by storing the current program counter and status register on the stack and jumping to a fixed address in memory where the interrupt handler code is located.
+*/
+void IRQ(struct cpu* cpu_6502){
+    if(!cpu_6502->I){
+
+    }
 }
 
+/*
+NMI (Non-Maskable Interrupt): This is a high-priority interrupt that cannot be disabled by software. 
+It is triggered by an external signal and is used for critical tasks that need immediate attention, such as system resets or power failures.
+*/
 void NMI(){
 
 }
 
-void reset(){
+/*
+Reset: This is a special type of interrupt that occurs when the processor is first powered on or when a hardware reset signal is sent to the processor. 
+The reset interrupt initializes the processor's registers and sets the program counter to a fixed address in memory where the system's boot code is located.
+*/
+void reset(){ // 
 
 }
-
-
-/* FUNCTION FOR CLOCK */
-
 
 /* THESE ARE THE ADDRESSING MODES FOR THE 6502 CPU */
 unsigned char IMM(unsigned char* address_space, unsigned short PC){
@@ -547,8 +559,8 @@ void execute_instruction(struct cpu* cpu_6502, unsigned char* address_space, uns
             break;
 
         default:
-            // Pause one cycle?
-            break
+            cpu_6502->PC++;
+            break;
 
         // There will be added more unofficial instructions
     }
