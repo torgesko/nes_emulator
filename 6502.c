@@ -48,6 +48,19 @@ with the addresses of the non-maskable interrupt handler ($FFFA/B),
 the power on reset location ($FFFC/D) and the BRK/interrupt request handler ($FFFE/F) respectively.
 */
 
+void initialize_cpu(struct cpu* cpu_6502, unsigned char** address_space){
+    cpu_6502->SR = 0b00100000; // LOOK MORE CLOSELY AT THIS LATER, MAY NOT BE RIGHT!
+    cpu_6502->SP = 0x01FF; // This is an indirect address ($0100 to $01FF reserved for the stack, grows downward)
+
+    *address_space = malloc(ADDRESS_SPACE_SIZE);
+
+    if(!address_space){
+        fprintf(stderr, "Allocation of memory failed for emulation");
+        exit(EXIT_FAILURE);
+    } 
+}
+
+/* Interrupts */
 void IRQ(){
 
 }
@@ -60,17 +73,6 @@ void reset(){
 
 }
 
-void initialize_cpu(struct cpu* cpu_6502, unsigned char** address_space){
-    cpu_6502->SR = 0b00100000; // LOOK MORE CLOSELY AT THIS LATER, MAY NOT BE RIGHT!
-    cpu_6502->SP = 0x01FF; // This is an indirect address ($0100 to $01FF reserved for the stack, grows downward)
-
-    *address_space = malloc(ADDRESS_SPACE_SIZE);
-
-    if(!address_space){
-        fprintf(stderr, "Allocation of memory failed for emulation");
-        exit(EXIT_FAILURE);
-    } 
-}
 
 /* FUNCTION FOR CLOCK */
 
