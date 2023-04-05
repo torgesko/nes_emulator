@@ -1,7 +1,5 @@
 #include<stdio.h>
 #include<stdlib.h>
-#include<time.h>
-#include<errno.h>
 
 #define ADDRESS_SPACE_SIZE 65536 // 16 bit program counter
 #define CYCLE_TIME 559 // Nanoseconds
@@ -48,6 +46,7 @@ with the addresses of the non-maskable interrupt handler ($FFFA/B),
 the power on reset location ($FFFC/D) and the BRK/interrupt request handler ($FFFE/F) respectively.
 */
 
+// Should I use reset instead??????
 void initialize_cpu(struct cpu* cpu_6502, unsigned char** address_space){
     cpu_6502->SR = 0b00100000; // LOOK MORE CLOSELY AT THIS LATER, MAY NOT BE RIGHT!
     cpu_6502->SP = 0x01FF; // This is an indirect address ($0100 to $01FF reserved for the stack, grows downward)
@@ -96,9 +95,17 @@ unsigned char ABSI(unsigned char* address_space, unsigned short PC, unsigned cha
     return address_space[address];
 }
 
-unsigned char IND(unsigned char* address_space, unsigned short PC){
+unsigned char ABSIND(unsigned char* address_space , unsigned short PC){
     unsigned short address = *(unsigned short*)(address_space + PC + 1);
-    address = *(unsigned short *)(address_space + address);
+    address = *(unsigned short*)(address_space + address);
+
+    return address_space[address];
+}
+
+unsigned char IND(unsigned char* address_space, unsigned short PC){
+    unsigned char zp_addr = address_space[PC];
+    
+    unsigned short address = *(unsigned short*) (address_space + zp_addr);
 
     return address_space[address];
 }
@@ -167,9 +174,9 @@ void execute_instruction(struct cpu* cpu_6502, unsigned char* address_space, uns
             
             break;
         case 0x05: // ORA (ZP)
+            unsigned char zp_value = ZP0(address_space, cpu_6502->PC);
             cpu_6502->PC += 2;
-            unsigned char zp_addr = address_space[cpu_6502->PC - 1];
-            cpu_6502->A = cpu_6502->A | address_space[zp_addr];
+            cpu_6502->A = cpu_6502->A | zp_value;
             break;
         case 0x06: // ASL (ZP)
             break;
