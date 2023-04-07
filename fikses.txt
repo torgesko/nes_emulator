@@ -48,3 +48,25 @@ In this example, we define the interrupt vector table at the beginning of the co
 When an IRQ or NMI occurs, the processor will automatically jump to the corresponding ISR, execute the code there, and then return to the main program loop. Note that the RTI (Return from Interrupt) instruction is used to return from the ISR and restore the original PC and PSR values from the stack.
 
 Interrupts can be a powerful tool for adding real-time responsiveness and I/O capabilities to your 6502 code. However, they can also be complex to implement and require careful attention to timing and synchronization issues.
+
+Write to bus
+
+Instructions that write to a memory address (All the offical instructions)
+    * Inc
+    * Dec
+    * LSR
+    * PHA
+    * PHP
+    * PLA
+    * PLP
+    * ROR
+    * ROL
+    * RTI
+    * RTS
+    * SBC
+    * STA
+    * STX
+    * STY
+
+
+Prøve å fikse interrupts and deretter implementere noen enkle assembly-instruksjoner
