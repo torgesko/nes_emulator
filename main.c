@@ -3,7 +3,11 @@
 #include "cpu.h"
 #include "bus.h"
 
-void main(int argc, char** argv){
+void thread_function(void* arg){
+
+}
+
+void main(int argc, char** argv, char** envp){
     struct bus BUS;
     struct cpu* CPU = &BUS.CPU;
     
@@ -14,8 +18,9 @@ void main(int argc, char** argv){
     // Load some program into the ram to test and then run it.
 
     // Create an extra thread (or more?) to populate the interrupt pools in the CPU. Need some sort of mutex for the interrupt pools. 
-
-
+    pthread_t interrupt_thread;
+    pthread_create(&interrupt_thread, NULL, , NULL);
+    //pthread_join(thread1, NULL); // Joins thread
 
     while(true){
         execute_instruction(CPU);

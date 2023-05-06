@@ -19,10 +19,12 @@ void reset(struct cpu* CPU){
     CPU->X = 0;
     CPU->Y = 0;
     CPU->SP = 0xFF;
-    CPU->SR = 0b00100000;
+    CPU->SR = 0b00100100;
 
     CPU->PCL = readb(CPU, 0xFFFC, 0);
-    CPU->PCH = readb(CPU, OxFFFD, 0);
+    CPU->PCH = readb(CPU, 0xFFFD, 0);
+
+    // This takes will take time.
 }
 
 void IRQ(struct cpu* CPU){
@@ -34,12 +36,14 @@ void IRQ(struct cpu* CPU){
         writeb(CPU, 0x0100 + CPU->SP, CPU->PCL);
         CPU->SP--;
 
-        CPU->SR |= 0b00010100;
+        CPU->SR |= 0b00100100;
         writeb(CPU, 0x0100 + CPU->SP, CPU->SR);
         CPU->SP--; 
 
         CPU->PCL = readb(CPU, 0xFFFE, 0);
-        CPU->PCH = readb(CPU, OxFFFF, 0);
+        CPU->PCH = readb(CPU, 0xFFFF, 0);
+
+        // This takes will take time
     } else {
         CPU->NMIFLAG = 0;
     }
@@ -47,21 +51,22 @@ void IRQ(struct cpu* CPU){
 
 void NMI(struct cpu* CPU){
     // Check the pool of NMI interrupts
+    if(CPU->NMIFLAG == 0){
+        CPU->NMIFLAG = 1;
 
-    CPU->NMIFLAG = 1;
-
-    writeb(CPU, 0x0100 + CPU->SP, CPU->PCH);
-    CPU->SP--;
-    writeb(CPU, 0x0100 + CPU->SP, CPU->PCL);
-    CPU->SP--;
+        writeb(CPU, 0x0100 + CPU->SP, CPU->PCH);
+        CPU->SP--;
+        writeb(CPU, 0x0100 + CPU->SP, CPU->PCL);
+        CPU->SP--;
     
-    CPU->SR |= 0b00010100;
+        CPU->SR |= 0b00010100;
 
-    writeb(CPU, 0x0100 + CPU->SP, CPU->SR);
-    CPU->SP--;
+        writeb(CPU, 0x0100 + CPU->SP, CPU->SR);
+        CPU->SP--;
 
-    CPU->PCL = readb(CPU, 0xFFFA, 0);
-    CPU->PCH = readb(CPU, OxFFFB, 0);
+        CPU->PCL = readb(CPU, 0xFFFA, 0);
+        CPU->PCH = readb(CPU, 0xFFFB, 0);
+    }
 }
 
 void execute_instruction(struct cpu* CPU){
@@ -524,7 +529,4 @@ void execute_instruction(struct cpu* CPU){
 
     NMI(CPU);
     IRQ(CPU);
-    // Use threads to populate the queues of interrupts
 }
-
-// Remember to implement unofficial opcodes!
